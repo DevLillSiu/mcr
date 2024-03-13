@@ -48,21 +48,26 @@ router.post('/insert_mcr_gmail', async (req, res) => {
         return res.status(400).send('No data provided!');
     }
 
-    values = values.map(value => value === '' || value.toLowerCase() === 'null' ? null : value);
+    values = values.map(value => {
+        if (typeof value === 'string') {
+            return value === '' || value.toLowerCase() === 'null' ? null : value;
+        }
+        return value;
+    });
 
-    const columnsString = columns.join(', ');
+    const columnsString = columns.map(column => `"${column}"`).join(', ');
 
-    const placeholders = columns.map(() => '?').join(', ');
+const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
 
-    const sqlQuery = `INSERT INTO mcr_gmail (${columnsString}) VALUES (${placeholders})`;
+const sqlQuery = `INSERT INTO mcr_gmail (${columnsString}) VALUES (${placeholders})`;
 
-    try {
-        const result = await query(sqlQuery, values);
-        res.send('Data inserted successfully');
-    } catch (err) {
-        console.error(err);
-        return res.status(500).send('Error inserting data into database');
-    }
+try {
+    const result = await query(sqlQuery, values);
+    res.send('Data inserted successfully');
+} catch (err) {
+    console.error(err);
+    return res.status(500).send('Error inserting data into database');
+}
 });
 
 router.put('/update_mcr_gmail', async (req, res) => {
