@@ -156,7 +156,12 @@ router.post('/insert_mcr_x', async (req, res) => {
         return res.status(400).send('No data provided!');
     }
 
-    values = values.map(value => value === '' || value.toLowerCase() === 'null' ? null : value);
+    values = values.map(value => {
+        if (typeof value === 'string') {
+            return value === '' || value.toLowerCase() === 'null' ? null : value;
+        }
+        return value;
+    });
 
     const columnsString = columns.join(', ');
 
