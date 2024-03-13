@@ -165,7 +165,7 @@ router.post('/insert_mcr_x', async (req, res) => {
 
     const columnsString = columns.join(', ');
 
-    const placeholders = columns.map(() => '?').join(', ');
+    const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
 
     const sqlQuery = `INSERT INTO mcr_x (${columnsString}) VALUES (${placeholders})`;
 
