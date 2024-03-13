@@ -163,19 +163,19 @@ router.post('/insert_mcr_x', async (req, res) => {
         return value;
     });
 
-    const columnsString = columns.join(', ');
+    const columnsString = columns.map(column => `"${column}"`).join(', ');
 
-    const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
 
-    const sqlQuery = `INSERT INTO mcr_x (${columnsString}) VALUES (${placeholders})`;
+const sqlQuery = `INSERT INTO mcr_x (${columnsString}) VALUES (${placeholders})`;
 
-    try {
-        const result = await query(sqlQuery, values);
-        res.send('Data inserted successfully');
-    } catch (err) {
-        console.error(err);
-        return res.status(500).send('Error inserting data into database');
-    }
+try {
+    const result = await query(sqlQuery, values);
+    res.send('Data inserted successfully');
+} catch (err) {
+    console.error(err);
+    return res.status(500).send('Error inserting data into database');
+}
 });
 
 router.put('/update_mcr_x', async (req, res) => {
