@@ -180,56 +180,38 @@ try {
 
 router.put('/update_mcr_x', async (req, res) => {
     const queryParams = req.body;
-    
+  
     if (!queryParams.id) {
-        return res.status(400).send('ID is required');
+      return res.status(400).send('ID is required');
     }
-
-    let queryString = 'UPDATE mcr_x SET ';
-    const queryParamsArray = [];
-    const entries = Object.entries(queryParams);
-    let lastKeyAdded = false;
-
-    for (let i = 0; i < entries.length; i++) {
-        const [key, value] = entries[i];
-
-        if (key === 'id') continue;
-
-        if (typeof value === 'string' && (value.toLowerCase() === 'null' || value === '')) {
-            queryString += `${key} = NULL`;
-            lastKeyAdded = true;
-        } else {
-            queryString += `${key} = ?`;
-            queryParamsArray.push(value);
-            lastKeyAdded = true;
-        }
-
-        if (i < entries.length - 1 && lastKeyAdded) {
-            queryString += ', ';
-            lastKeyAdded = false;
-        }
+  
+    // Validate and sanitize user input here (important!)
+  
+    const updateFields = Object.keys(queryParams).filter(key => key !== 'id');
+    if (updateFields.length === 0) {
+      return res.status(400).send('No fields provided to update');
     }
-
-    if (queryString.endsWith(', ')) {
-        queryString = queryString.slice(0, -2);
-    }
-
-    queryString += ' WHERE id = ?'; 
-    queryParamsArray.push(queryParams.id); 
-
+  
+    const setClauses = updateFields.map(field => `${field} = ?`).join(', ');
+    const queryParamsArray = updateFields.map(field => queryParams[field]);
+    queryParamsArray.push(queryParams.id);
+  
+    const queryString = `UPDATE mcr_x SET ${setClauses} WHERE id = ?`;
+  
     try {
-        const results = await query(queryString, queryParamsArray);
-        if (results.affectedRows === 0) {
-            res.status(404).send('Record not found');
-        } else {
-            console.log('Database updated successfully');
-            res.status(200).send('OK');
-        }
+      const results = await query(queryString, queryParamsArray);
+      if (results.affectedRows === 0) {
+        return res.status(404).send('Record not found');
+      } else {
+        console.log('Database updated successfully');
+        return res.status(200).send('OK');
+      }
     } catch (err) {
-        console.error('Error updating database:', err);
-        res.status(500).send('Internal Server Error');
+      console.error('Error updating database:', err);
+      return res.status(500).send('Internal Server Error');
     }
-});
+  });
+  
 
 router.delete('/delete_mcr_x', async (req, res) => {
     const id = req.body.id;
