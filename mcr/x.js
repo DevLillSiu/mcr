@@ -240,11 +240,11 @@ router.delete('/delete_mcr_x', async (req, res) => {
         return res.status(400).send('ID is required');
     }
 
-    const sqlQuery = 'DELETE FROM mcr_x WHERE id = ?';
+    const sqlQuery = 'DELETE FROM mcr_x WHERE id = $1';
 
     try {
-        const result = await query(sqlQuery, id);
-        if (result.affectedRows === 0) {
+        const result = await query(sqlQuery, [id]);
+        if (result.rowCount === 0) {
             return res.status(404).send('Record not found');
         }
         res.send('Data deleted successfully');
