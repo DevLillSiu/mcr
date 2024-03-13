@@ -188,6 +188,7 @@ router.put('/update_mcr_x', async (req, res) => {
     let queryString = 'UPDATE mcr_x SET ';
     const queryParamsArray = [];
     const entries = Object.entries(queryParams);
+    let lastKeyAdded = false;
 
     for (let i = 0; i < entries.length; i++) {
         const [key, value] = entries[i];
@@ -196,14 +197,21 @@ router.put('/update_mcr_x', async (req, res) => {
 
         if (typeof value === 'string' && (value.toLowerCase() === 'null' || value === '')) {
             queryString += `${key} = NULL`;
+            lastKeyAdded = true;
         } else {
             queryString += `${key} = ?`;
             queryParamsArray.push(value);
+            lastKeyAdded = true;
         }
 
-        if (i < entries.length - 1) {
+        if (i < entries.length - 1 && lastKeyAdded) {
             queryString += ', ';
+            lastKeyAdded = false;
         }
+    }
+
+    if (queryString.endsWith(', ')) {
+        queryString = queryString.slice(0, -2);
     }
 
     queryString += ' WHERE id = ?'; 
