@@ -191,7 +191,7 @@ router.put('/update_mcr_x', async (req, res) => {
     for (const [key, value] of Object.entries(queryParams)) {
         if (key === 'id') continue;
 
-        if (value.toLowerCase() === 'null' || value === '') {
+        if (typeof value === 'string' && (value.toLowerCase() === 'null' || value === '')) {
             queryString += `${key} = NULL, `;
         } else {
             queryString += `${key} = ?, `;
