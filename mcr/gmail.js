@@ -12,20 +12,20 @@ router.get('/nuoi_gmail', async (req, res) => {
     }
 
     try {
-        await query('START TRANSACTION');
+        await query('BEGIN');
 
-        let results = await query('SELECT id, username, link_save_file FROM mcr_gmail WHERE using = 0 AND date_reg <= DATE_SUB(NOW(), INTERVAL 3 HOUR) AND pc_name = ? AND (status <> "Nuoixong" OR status IS NULL) LIMIT 1 FOR UPDATE', [pc_name]);
+        let results = await query('SELECT id, username, link_save_file FROM mcr_gmail WHERE using = 0 AND date_reg <= (current_timestamp - interval \'3 hours\') AND pc_name = $1 AND (status <> \'Nuoixong\' OR status IS NULL) LIMIT 1 FOR UPDATE', [pc_name]);
 
-        if (results.length > 0) {
-            const data = results[0];
-            await query('UPDATE mcr_gmail SET using = 1 WHERE id = ?', [data.id]);
+        if (results.rowCount > 0) {
+            const data = results.rows[0];
+            await query('UPDATE mcr_gmail SET using = 1 WHERE id = $1', [data.id]);
             await query('COMMIT');
             return res.json(data);
         } else {
-            results = await query('SELECT id, username, link_save_file FROM mcr_gmail WHERE using = 0 AND pc_name = ? AND status = "Nuoixong" AND date_nuoi <= DATE_SUB(NOW(), INTERVAL 24 HOUR) LIMIT 1 FOR UPDATE', [pc_name]);
-            if (results.length > 0) {
-                const data = results[0];
-                await query('UPDATE mcr_gmail SET using = 1 WHERE id = ?', [data.id]);
+            results = await query('SELECT id, username, link_save_file FROM mcr_gmail WHERE using = 0 AND pc_name = $1 AND status = \'Nuoixong\' AND date_nuoi <= (current_timestamp - interval \'24 hours\') LIMIT 1 FOR UPDATE', [pc_name]);
+            if (results.rowCount > 0) {
+                const data = results.rows[0];
+                await query('UPDATE mcr_gmail SET using = 1 WHERE id = $1', [data.id]);
                 await query('COMMIT');
                 return res.json(data);
             } else {
@@ -39,7 +39,7 @@ router.get('/nuoi_gmail', async (req, res) => {
     }
 });
 
-router.post('/insert_mcr_gmail', async (req, res) => {
+router.post('/insert', async (req, res) => {
     const columns = Object.keys(req.body);
 
     let values = Object.values(req.body);
@@ -70,7 +70,7 @@ try {
 }
 });
 
-router.put('/update_mcr_gmail', async (req, res) => {
+router.put('/update', async (req, res) => {
     const queryParams = req.body;
     
     if (!queryParams.id) {
@@ -79,25 +79,41 @@ router.put('/update_mcr_gmail', async (req, res) => {
 
     let queryString = 'UPDATE mcr_gmail SET ';
     const queryParamsArray = [];
+    const entries = Object.entries(queryParams);
+    let lastKeyAdded = false;
+    let paramCount = 1;
 
-    for (const [key, value] of Object.entries(queryParams)) {
+    for (let i = 0; i < entries.length; i++) {
+        const [key, value] = entries[i];
+
         if (key === 'id') continue;
 
-        if (value.toLowerCase() === 'null' || value === '') {
-            queryString += `${key} = NULL, `;
+        if (typeof value === 'string' && (value.toLowerCase() === 'null' || value === '')) {
+            queryString += `${key} = NULL`;
+            lastKeyAdded = true;
         } else {
-            queryString += `${key} = ?, `;
+            queryString += `${key} = $${paramCount}`;
             queryParamsArray.push(value);
+            lastKeyAdded = true;
+            paramCount++;
+        }
+
+        if (i < entries.length - 1 && lastKeyAdded) {
+            queryString += ', ';
+            lastKeyAdded = false;
         }
     }
 
-    queryString = queryString.slice(0, -2); 
-    queryString += ' WHERE id = ?'; 
+    if (queryString.endsWith(', ')) {
+        queryString = queryString.slice(0, -2);
+    }
+
+    queryString += ` WHERE id = $${paramCount}`; 
     queryParamsArray.push(queryParams.id); 
 
     try {
         const results = await query(queryString, queryParamsArray);
-        if (results.affectedRows === 0) {
+        if (results.rowCount === 0) {
             res.status(404).send('Record not found');
         } else {
             console.log('Database updated successfully');
@@ -109,18 +125,18 @@ router.put('/update_mcr_gmail', async (req, res) => {
     }
 });
 
-router.delete('/delete_mcr_gmail', async (req, res) => {
+router.delete('/delete', async (req, res) => {
     const id = req.body.id;
 
     if (!id) {
         return res.status(400).send('ID is required');
     }
 
-    const sqlQuery = 'DELETE FROM mcr_gmail WHERE id = ?';
+    const sqlQuery = 'DELETE FROM mcr_gmail WHERE id = $1';
 
     try {
-        const result = await query(sqlQuery, id);
-        if (result.affectedRows === 0) {
+        const result = await query(sqlQuery, [id]);
+        if (result.rowCount === 0) {
             return res.status(404).send('Record not found');
         }
         res.send('Data deleted successfully');

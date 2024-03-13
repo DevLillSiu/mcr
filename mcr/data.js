@@ -27,8 +27,8 @@ const fetchData = () => {
                     reject(err);
                     return;
                 }
-                const key = Object.keys(results[0])[0];
-                data[key] = results[0][key];
+                const key = Object.keys(results.rows[0])[0];
+                data[key] = results.rows[0][key];
                 executeQuery(index + 1);
             });
         };
