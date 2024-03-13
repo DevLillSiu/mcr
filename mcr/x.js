@@ -199,6 +199,7 @@ router.put('/update_mcr_x', async (req, res) => {
         }
     }
 
+    queryString = queryString.slice(0, -2); 
     queryString = queryString.trim().endsWith(',') ? queryString.slice(0, -1) : queryString;
     queryString += ' WHERE id = ?'; 
     queryParamsArray.push(queryParams.id); 
