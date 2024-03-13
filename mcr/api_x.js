@@ -5,7 +5,7 @@ const Queue = require('promise-queue');
 
 const queue = new Queue(1);
 
-app.get('/api_tw', (req, res) => {
+router.get('/api_tw', (req, res) => {
     const day = parseInt(req.query.day);
     const shop = parseInt(req.query.shop);
     const check_2fa = parseInt(req.query.check_2fa);
