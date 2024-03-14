@@ -15,6 +15,24 @@ router.get("/api", (req, res) => {
 
   let dateFilter = "";
 
+  let checkshop = "";
+  let checkshop2 = "";
+  let thongke = "";
+
+  if (shop == 1) {
+    checkshop = `WHEN pc_name = 'Nguyen' THEN 1
+                            WHEN pc_name = 'ThanhTu' THEN 2
+                            WHEN pc_name = 'CongThanh' THEN 3`;
+    checkshop2 = `AND pc_name NOT IN('TranThiep')`;
+    thongke = "thongke_x_1";
+  } else if (shop == 2) {
+    checkshop = `WHEN pc_name = 'TranThiep' THEN 1
+                            WHEN pc_name = 'CongThanh' THEN 2
+                            WHEN pc_name = 'Nguyen' THEN 3`;
+    checkshop2 = "";
+    thongke = "thongke_x_2";
+  }
+
   if (day == 20) {
     if (check_2fa == 1 && cookie == 1) {
       dateFilter =
@@ -87,7 +105,10 @@ router.get("/api", (req, res) => {
               order_id,
               shop,
               check_2fa,
-              cookie
+              cookie,
+              checkshop,
+              checkshop2,
+              thongke
             )
               .then((result) => {
                 client.query("COMMIT", (err) => {
@@ -126,27 +147,12 @@ function executeQueries(
   order_id,
   shop,
   check_2fa,
-  cookie
+  cookie,
+  checkshop,
+  checkshop2,
+  thongke
 ) {
   return new Promise((resolve, reject) => {
-    let checkshop = "";
-    let checkshop2 = "";
-    let thongke = "";
-
-    if (shop == 1) {
-      checkshop = `WHEN pc_name = 'Nguyen' THEN 1
-                            WHEN pc_name = 'ThanhTu' THEN 2
-                            WHEN pc_name = 'CongThanh' THEN 3`;
-      checkshop2 = `AND pc_name NOT IN('TranThiep')`;
-      thongke = "thongke_x_1";
-    } else if (shop == 2) {
-      checkshop = `WHEN pc_name = 'TranThiep' THEN 1
-                            WHEN pc_name = 'CongThanh' THEN 2
-                            WHEN pc_name = 'Nguyen' THEN 3`;
-      checkshop2 = "";
-      thongke = "thongke_x_2";
-    }
-
     if (!order_id || isNaN(quantity)) {
       const countQuery = `SELECT COUNT(*) AS sum FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter}`;
       return client
