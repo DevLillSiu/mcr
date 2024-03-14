@@ -153,7 +153,7 @@ function executeQueries(
     if (live == 1) {
       check_live = `AND status = 'live'`;
     } else {
-      check_live = `AND (status NOT IN ('DaBanshop1', 'DaBanshop2', 'AccBanTay1', 'AccBanTay2') OR status = 'live')`;
+      check_live = `AND (status NOT IN ('DaBanshop1', 'DaBanshop2', 'AccBanTay1', 'AccBanTay2') OR status = 'live') OR status IS NULL`;
     }
 
     productQuery = `SELECT id, username, password, "2fa", mail, cookie, pc_name FROM mcr_x 
@@ -166,9 +166,9 @@ function executeQueries(
     connection.query(productQuery, [quantity], (error, results) => {
       if (error) return reject(error);
 
-      if (results.length === 0) {
+      if (results.rows.length === 0) {
         return resolve({ error: "Data not found" });
-      } else if (results.length < quantity) {
+      } else if (results.rows.length < quantity) {
         return resolve({ error: `Not enough data` });
       } else {
         let formattedResults = "";
