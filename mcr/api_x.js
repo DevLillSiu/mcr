@@ -155,7 +155,7 @@ function executeQueries(
         .catch((error) => reject(error));
     }
 
-    const productQuery = `SELECT id, username, password, twofa, mail, pc_name FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter} ORDER BY 
+    const productQuery = `SELECT id, username, password, twofa, mail, cookie, pc_name FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter} ORDER BY 
             CASE 
                 ${checkshop}
             END, date_reg DESC,
