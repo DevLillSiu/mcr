@@ -116,21 +116,21 @@ function executeQueries(
 
     if (day == 7 || day == 20) {
       if (check2fa == 1 && cookie == 1) {
-        check_2fa_cookie = `'2fa' IS NOT NULL AND cookie IS NOT NULL`;
+        check_2fa_cookie = `twofa IS NOT NULL AND cookie IS NOT NULL`;
       } else if (check2fa == 1 && cookie == 0) {
-        check_2fa_cookie = `'2fa' IS NOT NULL`;
+        check_2fa_cookie = `twofa IS NOT NULL`;
       } else if (check2fa == 0 && cookie == 1) {
-        check_2fa_cookie = `cookie IS NOT NULL AND '2fa' IS NULL`;
+        check_2fa_cookie = `cookie IS NOT NULL AND twofa IS NULL`;
       } else {
         check_2fa_cookie = "";
       }
     } else {
       if (check2fa == 1 && cookie == 1) {
-        check_2fa_cookie = `'2fa' IS NOT NULL AND cookie IS NOT NULL`;
+        check_2fa_cookie = `twofa IS NOT NULL AND cookie IS NOT NULL`;
       } else if (check2fa == 1 && cookie == 0) {
-        check_2fa_cookie = `'2fa' IS NOT NULL`;
+        check_2fa_cookie = `twofa IS NOT NULL`;
       } else if (check2fa == 0 && cookie == 1) {
-        check_2fa_cookie = `cookie IS NOT NULL AND '2fa' IS NULL`;
+        check_2fa_cookie = `cookie IS NOT NULL AND twofa IS NULL`;
       } else {
         check_2fa_cookie = "";
       }
@@ -156,7 +156,7 @@ function executeQueries(
       check_live = `AND (status NOT IN ('DaBanshop1', 'DaBanshop2', 'AccBanTay1', 'AccBanTay2') OR status = 'live') OR status IS NULL`;
     }
 
-    productQuery = `SELECT id, username, password, '2fa', mail, cookie, pc_name FROM mcr_x 
+    productQuery = `SELECT id, username, password, twofa, mail, cookie, pc_name FROM mcr_x 
    WHERE ${check_2fa_cookie} ${check_live} ${checkshop2} ${dateFilter} ORDER BY 
     CASE 
         ${checkshop}
@@ -176,12 +176,12 @@ function executeQueries(
         if (check2fa == 1 && cookie == 1) {
           formattedResults = results.rows.map(
             (item) =>
-              `${item.username}|${item.password}|${item["2fa"]}|${item.mail}|${item.cookie}`
+              `${item.username}|${item.password}|${item[twofa]}|${item.mail}|${item.cookie}`
           );
         } else if (check2fa == 1 && cookie == 0) {
           formattedResults = results.rows.map(
             (item) =>
-              `${item.username}|${item.password}|${item["2fa"]}|${item.mail}`
+              `${item.username}|${item.password}|${item[twofa]}|${item.mail}`
           );
         } else if (check2fa == 0 && cookie == 1) {
           formattedResults = results.rows.map(
