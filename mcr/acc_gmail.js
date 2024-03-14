@@ -110,9 +110,9 @@ function executeQueries(connection, quantity, day, live) {
     }
 
     if (live == 1) {
-      checklive = `status = 'live'`;
+      checklive = `status = 'Nuoixong'`;
     } else {
-      checklive = `(status NOT IN ('DaBan', 'AccBanTay') OR status = 'Nuoixong')`;
+      checklive = `(status NOT IN ('DaBan', 'AccBanTay') OR status = 'Nuoixong' OR status IS NULL)`;
     }
 
     productQuery = `SELECT id, username, password, recovery_mail, pc_name FROM mcr_gmail 
@@ -122,20 +122,20 @@ function executeQueries(connection, quantity, day, live) {
     connection.query(productQuery, [quantity], (error, results) => {
       if (error) return reject(error);
 
-      if (results.length === 0) {
+      if (results.rows.length === 0) {
         return resolve({ error: "Data not found" });
-      } else if (results.length < quantity) {
+      } else if (results.rows.length < quantity) {
         return resolve({ error: `Not enough data` });
       } else {
         let formattedResults = "";
 
-        formattedResults = results.map(
+        formattedResults = results.rows.map(
           (item) =>
             `${item.username}@gmail.com|${item.password}|${item.recovery_mail}`
         );
 
-        const idsToUpdate = results.map((item) => item.id);
-        const updateQuery = `UPDATE mcr_gmail SET status = 'AccBanTay', sold_date = CURRENT_TIMESTAMP WHERE id = ANY($1)`;
+        const idsToUpdate = results.rows.map((item) => item.id);
+        const updateQuery = `UPDATE mcr_gmail SET status = 'AccBanTay', sold_date = NOW() WHERE id = ANY($1)`;
 
         connection.query(updateQuery, [idsToUpdate], (updateError) => {
           if (updateError) return reject(updateError);

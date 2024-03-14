@@ -48,7 +48,7 @@ router.get("/get", (req, res) => {
         .toISOString()
         .slice(0, 10)
         .replace(/-/g, "");
-      const fileName = `twitter_${currentDate}_${quantity}.txt`;
+      const fileName = `x_${currentDate}_${quantity}.txt`;
 
       if (!Array.isArray(formattedResults)) {
         formattedResults = [];

@@ -82,17 +82,17 @@ function executeQueries(connection, quantity, dateFilter, order_id) {
     connection.query(productQuery, [quantity], (error, results) => {
       if (error) return reject(error);
 
-      if (results.length === 0) {
+      if (results.rows.length === 0) {
         return resolve({ error: "Data not found" });
-      } else if (results.length < quantity) {
+      } else if (results.rows.length < quantity) {
         return resolve({ error: `Not enough data` });
       } else {
-        const formattedResults = results.map((item) => ({
+        const formattedResults = results.rows.map((item) => ({
           product: `${item.username}@gmail.com|${item.password}|${item.recovery_mail}`,
         }));
 
-        const idsToUpdate = results.map((item) => item.id);
-        const updateQuery = `UPDATE mcr_gmail SET status = 'DaBan', kt = 1, sold_date = CURRENT_TIMESTAMP WHERE id = ANY($1)`;
+        const idsToUpdate = results.rows.map((item) => item.id);
+        const updateQuery = `UPDATE mcr_gmail SET status = 'DaBan', kt = 1, sold_date = NOW() WHERE id = ANY($1)`;
 
         connection.query(updateQuery, [idsToUpdate], (updateError) => {
           if (updateError) return reject(updateError);

@@ -14,7 +14,6 @@ router.get("/api", (req, res) => {
   const quantity = parseInt(req.query.quantity);
 
   let dateFilter = "";
-
   let checkshop = "";
   let checkshop2 = "";
   let thongke = "";
