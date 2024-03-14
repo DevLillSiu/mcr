@@ -130,7 +130,7 @@ function executeQueries(
 ) {
   return new Promise((resolve, reject) => {
     if (!order_id || isNaN(quantity)) {
-      const countQuery = `SELECT COUNT(*) AS sum FROM mcr_x WHERE status = 'live' ${dateFilter}`;
+      const countQuery = `SELECT COUNT(*) AS sum FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter}`;
       return client
         .query(countQuery)
         .then((results) => resolve({ sum: results.rows[0].sum }))
