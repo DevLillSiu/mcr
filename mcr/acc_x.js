@@ -174,23 +174,23 @@ function executeQueries(
         let formattedResults = "";
 
         if (check2fa == 1 && cookie == 1) {
-          formattedResults = results.map(
+          formattedResults = results.rows.map(
             (item) =>
               `${item.username}|${item.password}|${item["2fa"]}|${item.mail}|${item.cookie}`
           );
         } else if (check2fa == 1 && cookie == 0) {
-          formattedResults = results.map(
+          formattedResults = results.rows.map(
             (item) =>
               `${item.username}|${item.password}|${item["2fa"]}|${item.mail}`
           );
         } else if (check2fa == 0 && cookie == 1) {
-          formattedResults = results.map(
+          formattedResults = results.rows.map(
             (item) =>
               `${item.username}|${item.password}|${item.mail}|${item.cookie}`
           );
         }
 
-        const idsToUpdate = results.map((item) => item.id);
+        const idsToUpdate = results.rows.map((item) => item.id);
         const updateQuery = `UPDATE mcr_x SET status = 'AccBanTay${shop}', sold_date = CURRENT_DATE WHERE id = ANY($1)`;
 
         connection.query(updateQuery, [idsToUpdate], (updateError) => {
