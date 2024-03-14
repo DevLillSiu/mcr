@@ -16,48 +16,30 @@ router.get("/get", (req, res) => {
 
   queue
     .add(() => {
-      return new Promise((resolve, reject) => {
-        db.getConnection((err, connection) => {
-          if (err) {
-            return reject(err);
-          }
+      return new Promise(async (resolve, reject) => {
+        const client = await db.connect();
 
-          connection.beginTransaction((err) => {
-            if (err) {
-              connection.release();
-              return reject(err);
-            }
+        try {
+          await client.query("BEGIN");
 
-            executeQueries(
-              connection,
-              quantity,
-              check2fa,
-              cookie,
-              day,
-              shop,
-              live
-            )
-              .then((result) => {
-                connection.commit((err) => {
-                  if (err) {
-                    connection.rollback(() => {
-                      connection.release();
-                      reject(err);
-                    });
-                  } else {
-                    connection.release();
-                    resolve(result);
-                  }
-                });
-              })
-              .catch((err) => {
-                connection.rollback(() => {
-                  connection.release();
-                  reject(err);
-                });
-              });
-          });
-        });
+          const result = await executeQueries(
+            client,
+            quantity,
+            check2fa,
+            cookie,
+            day,
+            shop,
+            live
+          );
+
+          await client.query("COMMIT");
+          resolve(result);
+        } catch (err) {
+          await client.query("ROLLBACK");
+          reject(err);
+        } finally {
+          client.release();
+        }
       });
     })
     .then((formattedResults) => {
