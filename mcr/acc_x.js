@@ -196,7 +196,7 @@ function executeQueries(
         connection.query(updateQuery, [idsToUpdate], (updateError) => {
           if (updateError) return reject(updateError);
           const pcNameCounts = {};
-          results.forEach((item) => {
+          results.rows.forEach((item) => {
             pcNameCounts[item.pc_name] = (pcNameCounts[item.pc_name] || 0) + 1;
           });
 
