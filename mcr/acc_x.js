@@ -191,7 +191,7 @@ function executeQueries(
         }
 
         const idsToUpdate = results.rows.map((item) => item.id);
-        const updateQuery = `UPDATE mcr_x SET status = 'AccBanTay${shop}', sold_date = CURRENT_DATE WHERE id = ANY($1)`;
+        const updateQuery = `UPDATE mcr_x SET status = 'AccBanTay${shop}', sold_date = NOW() WHERE id = ANY($1)`;
 
         connection.query(updateQuery, [idsToUpdate], (updateError) => {
           if (updateError) return reject(updateError);

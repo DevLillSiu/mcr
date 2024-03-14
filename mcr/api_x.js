@@ -18,26 +18,26 @@ router.get("/api", (req, res) => {
   if (day == 20) {
     if (check_2fa == 1 && cookie == 1) {
       dateFilter =
-        "AND 2fa IS NOT NULL AND cookie IS NOT NULL AND date_reg < (CURRENT_DATE - INTERVAL '20 DAY')";
+        "AND twofa IS NOT NULL AND cookie IS NOT NULL AND date_reg < (CURRENT_DATE - INTERVAL '20 DAY')";
     } else if (check_2fa == 1 && cookie == 0) {
       dateFilter =
-        "AND 2fa IS NOT NULL AND date_reg < (CURRENT_DATE - INTERVAL '20 DAY')";
+        "AND twofa IS NOT NULL AND date_reg < (CURRENT_DATE - INTERVAL '20 DAY')";
     } else if (check_2fa == 0 && cookie == 1) {
       dateFilter =
-        "AND 2fa IS NULL AND cookie IS NOT NULL AND date_reg < (CURRENT_DATE - INTERVAL '20 DAY')";
+        "AND twofa IS NULL AND cookie IS NOT NULL AND date_reg < (CURRENT_DATE - INTERVAL '20 DAY')";
     } else {
       dateFilter = "AND date_reg < (CURRENT_DATE - INTERVAL '20 DAY')";
     }
   } else if (day == 7) {
     if (check_2fa == 1 && cookie == 1) {
       dateFilter =
-        "AND 2fa IS NOT NULL AND cookie IS NOT NULL AND date_reg BETWEEN (CURRENT_DATE - INTERVAL '20 DAY') AND (CURRENT_DATE - INTERVAL '7 DAY')";
+        "AND twofa IS NOT NULL AND cookie IS NOT NULL AND date_reg BETWEEN (CURRENT_DATE - INTERVAL '20 DAY') AND (CURRENT_DATE - INTERVAL '7 DAY')";
     } else if (check_2fa == 1 && cookie == 0) {
       dateFilter =
-        "AND 2fa IS NOT NULL AND date_reg BETWEEN (CURRENT_DATE - INTERVAL '20 DAY') AND (CURRENT_DATE - INTERVAL '7 DAY')";
+        "AND twofa IS NOT NULL AND date_reg BETWEEN (CURRENT_DATE - INTERVAL '20 DAY') AND (CURRENT_DATE - INTERVAL '7 DAY')";
     } else if (check_2fa == 0 && cookie == 1) {
       dateFilter =
-        "AND 2fa IS NULL AND cookie IS NOT NULL AND date_reg BETWEEN (CURRENT_DATE - INTERVAL '20 DAY') AND (CURRENT_DATE - INTERVAL '7 DAY')";
+        "AND twofa IS NULL AND cookie IS NOT NULL AND date_reg BETWEEN (CURRENT_DATE - INTERVAL '20 DAY') AND (CURRENT_DATE - INTERVAL '7 DAY')";
     } else {
       dateFilter =
         "AND date_reg BETWEEN (CURRENT_DATE - INTERVAL '20 DAY') AND (CURRENT_DATE - INTERVAL '7 DAY')";
@@ -45,22 +45,22 @@ router.get("/api", (req, res) => {
   } else if (day == 1) {
     if (check_2fa == 1 && cookie == 1) {
       dateFilter =
-        "AND 2fa IS NOT NULL AND cookie IS NOT NULL AND date_reg = CURRENT_DATE";
+        "AND twofa IS NOT NULL AND cookie IS NOT NULL AND date_reg = CURRENT_DATE";
     } else if (check_2fa == 1 && cookie == 0) {
-      dateFilter = "AND 2fa IS NOT NULL AND date_reg = CURRENT_DATE";
+      dateFilter = "AND twofa IS NOT NULL AND date_reg = CURRENT_DATE";
     } else if (check_2fa == 0 && cookie == 1) {
       dateFilter =
-        "AND 2fa IS NULL AND cookie IS NOT NULL AND date_reg = CURRENT_DATE";
+        "AND twofa IS NULL AND cookie IS NOT NULL AND date_reg = CURRENT_DATE";
     } else {
       dateFilter = "AND date_reg = CURRENT_DATE";
     }
   } else {
     if (check_2fa == 1 && cookie == 1) {
-      dateFilter = `AND 2fa IS NOT NULL AND cookie IS NOT NULL AND date_reg = (CURRENT_DATE - INTERVAL '${day} DAY')`;
+      dateFilter = `AND twofa IS NOT NULL AND cookie IS NOT NULL AND date_reg = (CURRENT_DATE - INTERVAL '${day} DAY')`;
     } else if (check_2fa == 1 && cookie == 0) {
-      dateFilter = `AND 2fa IS NOT NULL AND date_reg = (CURRENT_DATE - INTERVAL '${day} DAY')`;
+      dateFilter = `AND twofa IS NOT NULL AND date_reg = (CURRENT_DATE - INTERVAL '${day} DAY')`;
     } else if (check_2fa == 0 && cookie == 1) {
-      dateFilter = `AND 2fa IS NULL AND cookie IS NOT NULL AND date_reg = (CURRENT_DATE - INTERVAL '${day} DAY')`;
+      dateFilter = `AND twofa IS NULL AND cookie IS NOT NULL AND date_reg = (CURRENT_DATE - INTERVAL '${day} DAY')`;
     } else {
       dateFilter = `AND date_reg = (CURRENT_DATE - INTERVAL '${day} DAY')`;
     }
@@ -145,16 +145,16 @@ function executeQueries(
       checkshop = `WHEN pc_name = 'Nguyen' THEN 1
                             WHEN pc_name = 'ThanhTu' THEN 2
                             WHEN pc_name = 'CongThanh' THEN 3`;
-      checkshop2 = `pc_name NOT IN('TranThiep')`;
+      checkshop2 = `AND pc_name NOT IN('TranThiep')`;
       thongke = "thongke_x_1";
     } else if (shop == 2) {
       checkshop = `WHEN pc_name = 'TranThiep' THEN 1
                             WHEN pc_name = 'CongThanh' THEN 2
                             WHEN pc_name = 'Nguyen' THEN 3`;
-      checkshop2 = ``;
+      checkshop2 = "";
       thongke = "thongke_x_2";
     }
-    const productQuery = `SELECT id, username, password, 2fa, mail, pc_name FROM mcr_x WHERE status = 'live' AND ${checkshop2} ${dateFilter} ORDER BY 
+    const productQuery = `SELECT id, username, password, twofa, mail, pc_name FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter} ORDER BY 
             CASE 
                 ${checkshop}
             END, date_reg DESC,
@@ -173,12 +173,12 @@ function executeQueries(
           if (check_2fa == 1 && cookie == 1) {
             formattedResults = results.rows.map(
               (item) =>
-                `${item.username}|${item.password}|${item["2fa"]}|${item.mail}|${item.cookie}`
+                `${item.username}|${item.password}|${item.twofa}|${item.mail}|${item.cookie}`
             );
           } else if (check_2fa == 1 && cookie == 0) {
             formattedResults = results.rows.map(
               (item) =>
-                `${item.username}|${item.password}|${item["2fa"]}|${item.mail}`
+                `${item.username}|${item.password}|${item.twofa}|${item.mail}`
             );
           } else if (check_2fa == 0 && cookie == 1) {
             formattedResults = results.rows.map(
