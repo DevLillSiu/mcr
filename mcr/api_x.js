@@ -129,14 +129,6 @@ function executeQueries(
   cookie
 ) {
   return new Promise((resolve, reject) => {
-    if (!order_id || isNaN(quantity)) {
-      const countQuery = `SELECT COUNT(*) AS sum FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter}`;
-      return client
-        .query(countQuery)
-        .then((results) => resolve({ sum: results.rows[0].sum }))
-        .catch((error) => reject(error));
-    }
-
     let checkshop = "";
     let checkshop2 = "";
     let thongke = "";
@@ -154,6 +146,15 @@ function executeQueries(
       checkshop2 = "";
       thongke = "thongke_x_2";
     }
+
+    if (!order_id || isNaN(quantity)) {
+      const countQuery = `SELECT COUNT(*) AS sum FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter}`;
+      return client
+        .query(countQuery)
+        .then((results) => resolve({ sum: results.rows[0].sum }))
+        .catch((error) => reject(error));
+    }
+
     const productQuery = `SELECT id, username, password, twofa, mail, pc_name FROM mcr_x WHERE status = 'live' ${checkshop2} ${dateFilter} ORDER BY 
             CASE 
                 ${checkshop}
