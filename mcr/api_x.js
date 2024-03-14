@@ -69,7 +69,7 @@ router.get("/api", (req, res) => {
   queue
     .add(() => {
       return new Promise((resolve, reject) => {
-        pool.connect((err, client, done) => {
+        db.connect((err, client, done) => {
           if (err) {
             return reject(err);
           }
