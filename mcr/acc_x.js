@@ -176,12 +176,12 @@ function executeQueries(
         if (check2fa == 1 && cookie == 1) {
           formattedResults = results.rows.map(
             (item) =>
-              `${item.username}|${item.password}|${item[twofa]}|${item.mail}|${item.cookie}`
+              `${item.username}|${item.password}|${item.twofa}|${item.mail}|${item.cookie}`
           );
         } else if (check2fa == 1 && cookie == 0) {
           formattedResults = results.rows.map(
             (item) =>
-              `${item.username}|${item.password}|${item[twofa]}|${item.mail}`
+              `${item.username}|${item.password}|${item.twofa}|${item.mail}`
           );
         } else if (check2fa == 0 && cookie == 1) {
           formattedResults = results.rows.map(
