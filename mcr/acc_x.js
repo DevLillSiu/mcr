@@ -85,7 +85,15 @@ router.get("/get", (req, res) => {
     });
 });
 
-function executeQueries(connection, quantity, check2fa, cookie, day, shop) {
+function executeQueries(
+  connection,
+  quantity,
+  check2fa,
+  cookie,
+  day,
+  shop,
+  live
+) {
   return new Promise((resolve, reject) => {
     let dateFilter = "";
     let productQuery = "";
