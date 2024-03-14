@@ -7,12 +7,12 @@ const Queue = require("promise-queue");
 const queue = new Queue(1);
 
 router.get("/get", (req, res) => {
-  const quantity = parseInt(req.query.quantity);
-  const check2fa = parseInt(req.query.check2fa);
-  const cookie = parseInt(req.query.cookie);
-  const day = parseInt(req.query.day);
-  const shop = parseInt(req.query.shop);
-  const live = parseInt(req.query.live);
+  const quantity = parseInt(req.query.quantity); //1000
+  const check2fa = parseInt(req.query.check2fa); //1,0
+  const cookie = parseInt(req.query.cookie); //1,0
+  const day = parseInt(req.query.day); //1,7,20
+  const shop = parseInt(req.query.shop); //1,2
+  const live = parseInt(req.query.live); //1,0
 
   queue
     .add(() => {

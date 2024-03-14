@@ -7,9 +7,9 @@ const Queue = require("promise-queue");
 const queue = new Queue(1);
 
 router.get("/get", (req, res) => {
-  const quantity = parseInt(req.query.quantity);
-  const day = parseInt(req.query.day);
-  const live = parseInt(req.query.live);
+  const quantity = parseInt(req.query.quantity); //1000
+  const day = parseInt(req.query.day); //1,7,20
+  const live = parseInt(req.query.live); //1,0
 
   queue
     .add(() => {
