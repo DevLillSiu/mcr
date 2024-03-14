@@ -140,7 +140,7 @@ function executeQueries(
       checkshop = `WHEN pc_name = 'Nguyen' THEN 1
                 WHEN pc_name = 'ThanhTu' THEN 2
                 WHEN pc_name = 'CongThanh' THEN 3`;
-      checkshop2 = `pc_name NOT IN('TranThiep')`;
+      checkshop2 = `AND pc_name NOT IN('TranThiep')`;
       thongke = "thongke_x_1";
     } else if (shop == 2) {
       checkshop = `WHEN pc_name = 'TranThiep' THEN 1
@@ -151,13 +151,13 @@ function executeQueries(
     }
 
     if (live == 1) {
-      check_live = `status = 'live'`;
+      check_live = `AND status = 'live'`;
     } else {
-      check_live = `(status NOT IN ('DaBanshop1', 'DaBanshop2', 'AccBanTay1', 'AccBanTay2') OR status = 'live')`;
+      check_live = `AND (status NOT IN ('DaBanshop1', 'DaBanshop2', 'AccBanTay1', 'AccBanTay2') OR status = 'live')`;
     }
 
     productQuery = `SELECT id, username, password, "2fa", mail, cookie, pc_name FROM mcr_x 
-   WHERE ${check_2fa_cookie} AND ${check_live} AND ${checkshop2} ${dateFilter} ORDER BY 
+   WHERE ${check_2fa_cookie} ${check_live} ${checkshop2} ${dateFilter} ORDER BY 
     CASE 
         ${checkshop}
     END, date_reg DESC,
