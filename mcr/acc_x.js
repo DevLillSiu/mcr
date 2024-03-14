@@ -122,7 +122,7 @@ function executeQueries(
       } else if (check2fa == 0 && cookie == 1) {
         check_2fa_cookie = `cookie IS NOT NULL AND "2fa" IS NULL`;
       } else {
-        check_2fa_cookie = ``;
+        check_2fa_cookie = "";
       }
     } else {
       if (check2fa == 1 && cookie == 1) {
@@ -132,7 +132,7 @@ function executeQueries(
       } else if (check2fa == 0 && cookie == 1) {
         check_2fa_cookie = `cookie IS NOT NULL AND "2fa" IS NULL`;
       } else {
-        check_2fa_cookie = ``;
+        check_2fa_cookie = "";
       }
     }
 
@@ -146,7 +146,7 @@ function executeQueries(
       checkshop = `WHEN pc_name = 'TranThiep' THEN 1
                 WHEN pc_name = 'CongThanh' THEN 2
                 WHEN pc_name = 'Nguyen' THEN 3`;
-      checkshop2 = ``;
+      checkshop2 = "";
       thongke = "thongke_x_2";
     }
 
