@@ -8,7 +8,6 @@ const gmail = require("./gmail");
 const acc_gmail = require("./acc_gmail");
 const api_gmail = require("./api_gmail");
 const hotmail = require("./hotmail");
-const fingerprints = require("./fingerprints");
 
 const data = require("./data");
 
@@ -27,8 +26,6 @@ app.use("/acc_gmail", acc_gmail);
 app.use("/api_gmail", api_gmail);
 
 app.use("/hotmail", hotmail);
-
-app.use("/fingerprints", fingerprints);
 
 app.use(express.static("public"));
 
