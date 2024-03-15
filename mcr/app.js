@@ -9,8 +9,6 @@ const acc_gmail = require("./acc_gmail");
 const api_gmail = require("./api_gmail");
 const hotmail = require("./hotmail");
 
-const data = require("./data");
-
 app.use(express.json());
 
 app.use("/x", x);
