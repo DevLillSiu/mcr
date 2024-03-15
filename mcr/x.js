@@ -169,21 +169,23 @@ router.get("/check_point", (req, res) => {
 });
 
 router.post("/insert", async (req, res) => {
-  const cookieString = req.body.cookie;
-  const cookieValues = cookieString.split(";").reduce((result, item) => {
-    const [key, value] = item.split("=");
-    result[key.trim()] = value;
-    return result;
-  }, {});
+  const columns = Object.keys(req.body);
 
-  const columns = Object.keys(cookieValues);
-  let values = Object.values(cookieValues);
+  let values = Object.values(req.body);
 
   if (columns.length === 0) {
     return res.status(400).send("No data provided!");
   }
 
+  values = values.map((value) => {
+    if (typeof value === "string") {
+      return value === "" || value.toLowerCase() === "null" ? null : value;
+    }
+    return value;
+  });
+
   const columnsString = columns.map((column) => `"${column}"`).join(", ");
+
   const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
 
   const sqlQuery = `INSERT INTO mcr_x (${columnsString}) VALUES (${placeholders})`;
