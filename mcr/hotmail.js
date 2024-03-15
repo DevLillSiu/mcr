@@ -56,9 +56,9 @@ router.get("/get", (req, res) => {
 });
 
 router.post("/insert", async (req, res) => {
-  const columns = Object.keys(req.body);
+  const columns = Object.keys(req.query);
 
-  let values = Object.values(req.body);
+  let values = Object.values(req.query);
 
   if (columns.length === 0) {
     return res.status(400).send("No data provided!");
@@ -87,7 +87,7 @@ router.post("/insert", async (req, res) => {
 });
 
 router.put("/update", async (req, res) => {
-  const queryParams = req.body;
+  const queryParams = req.query;
 
   if (!queryParams.id) {
     return res.status(400).send("ID is required");
@@ -145,7 +145,7 @@ router.put("/update", async (req, res) => {
 });
 
 router.delete("/delete", async (req, res) => {
-  const id = req.body.id;
+  const id = req.query.id;
 
   if (!id) {
     return res.status(400).send("ID is required");
