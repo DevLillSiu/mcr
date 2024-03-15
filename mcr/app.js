@@ -27,10 +27,6 @@ app.use("/api_gmail", api_gmail);
 
 app.use("/hotmail", hotmail);
 
-app.use(express.static("public"));
-
-app.use("/data", data);
-
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
