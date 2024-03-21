@@ -61,9 +61,9 @@ const queueCheckLive = async.queue((task, callback) => {
   db.connect().then((client) => {
     client.query("BEGIN").then(() => {
       const queries = [
-        `SELECT id, username FROM mcr_x WHERE status IS NULL AND date_reg BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE - INTERVAL '1 day' ORDER BY date_reg DESC  LIMIT 20 FOR UPDATE`,
-        `SELECT id, username FROM mcr_x WHERE status IS NULL AND date_cp <= CURRENT_DATE - INTERVAL '1 day' AND date_reg BETWEEN CURRENT_DATE - INTERVAL '14 days' AND CURRENT_DATE - INTERVAL '8 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
-        `SELECT id, username FROM mcr_x WHERE status IS NULL AND date_cp <= CURRENT_DATE - INTERVAL '2 days' AND date_reg <= CURRENT_DATE - INTERVAL '14 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
+        `SELECT id, username FROM mcr_x WHERE status IS NULL AND DATE(date_reg) BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE - INTERVAL '1 day' ORDER BY date_reg DESC  LIMIT 20 FOR UPDATE`,
+        `SELECT id, username FROM mcr_x WHERE status IS NULL AND (DATE(date_cp) <= CURRENT_DATE - INTERVAL '1 day' OR date_cp IS NULL) AND DATE(date_reg) BETWEEN CURRENT_DATE - INTERVAL '14 days' AND CURRENT_DATE - INTERVAL '8 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
+        `SELECT id, username FROM mcr_x WHERE status IS NULL AND (DATE(date_cp) <= CURRENT_DATE - INTERVAL '2 days' OR date_cp IS NULL) AND DATE(date_reg) <= CURRENT_DATE - INTERVAL '14 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
       ];
 
       let results;
