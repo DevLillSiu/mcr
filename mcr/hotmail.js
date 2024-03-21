@@ -3,12 +3,14 @@ const router = express.Router();
 const db = require("./database");
 const util = require("util");
 const query = util.promisify(db.query).bind(db);
+const async = require("async");
 
-router.get("/get", (req, res) => {
-  db.query("BEGIN", (err) => {
+const queueGet = async.queue((task, callback) => {
+  db.beginTransaction((err) => {
     if (err) {
       console.error("Transaction error:", err);
-      return res.status(500).send("Lỗi kết nối cơ sở dữ liệu");
+      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
+      return;
     }
 
     db.query(
@@ -16,42 +18,56 @@ router.get("/get", (req, res) => {
       (error, results) => {
         if (error) {
           console.error("Query error:", error);
-          return db.query("ROLLBACK", () => {
-            res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
+          db.rollback(() => {
+            callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
           });
+          return;
         }
 
-        if (results.rowCount === 0) {
-          return db.query("ROLLBACK", () => {
-            res.status(404).send("Không tìm thấy dữ liệu");
+        if (results.rows.length === 0) {
+          db.rollback(() => {
+            callback(new Error("Không tìm thấy dữ liệu"));
           });
+          return;
         }
 
-        const data = results.rows[0];
+        const data = results[0];
         db.query(
           `UPDATE mcr_hotmail SET status = 1 WHERE id = $1`,
-          [data.id],
+          data.id,
           (updateError) => {
             if (updateError) {
               console.error("Update error:", updateError);
-              return db.query("ROLLBACK", () => {
-                res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
+              db.rollback(() => {
+                callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
               });
+              return;
             }
 
-            db.query("COMMIT", (commitErr) => {
+            db.commit((commitErr) => {
               if (commitErr) {
                 console.error("Commit error:", commitErr);
-                return db.query("ROLLBACK", () => {
-                  res.status(500).send("Lỗi commit giao dịch");
+                db.rollback(() => {
+                  callback(new Error("Lỗi commit giao dịch"));
                 });
+                return;
               }
-              res.json(data);
+              callback(null, data);
             });
           }
         );
       }
     );
+  });
+}, 1);
+
+router.get("/get", (req, res) => {
+  queueGet.push({}, (err, data) => {
+    if (err) {
+      console.error("Lỗi hàng đợi:", err);
+      return res.status(500).send(err.message);
+    }
+    res.json(data);
   });
 });
 

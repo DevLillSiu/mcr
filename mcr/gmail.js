@@ -3,49 +3,119 @@ const router = express.Router();
 const db = require("./database");
 const util = require("util");
 const query = util.promisify(db.query).bind(db);
+const async = require("async");
 
-router.get("/nuoi_gmail", async (req, res) => {
+const worker = (task, callback) => {
+  const { pc_name, res } = task;
+
+  db.query("BEGIN", (err) => {
+    if (err) {
+      res.status(500).send("Lỗi kết nối cơ sở dữ liệu");
+      return callback(err);
+    }
+
+    db.query(
+      `SELECT id, username, link_save_file, errorNW  FROM acc_gmail WHERE kt = 0 AND date <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND (status <> 'Nuoixong' OR status IS NULL) LIMIT 1 FOR UPDATE`,
+      [pc_name],
+      (error, results) => {
+        if (error) {
+          return db.query("ROLLBACK", () => {
+            res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
+            callback(error);
+          });
+        }
+
+        if (results.rows.length > 0) {
+          const data = results.rows[0];
+          db.query(
+            `UPDATE acc_gmail SET kt = 1 WHERE id = $1`,
+            [data.id],
+            (updateError) => {
+              if (updateError) {
+                console.error("Lỗi cập nhật cơ sở dữ liệu:", updateError);
+                return db.query("ROLLBACK", () => {
+                  res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
+                  callback(updateError);
+                });
+              }
+              db.query("COMMIT", (commitErr) => {
+                if (commitErr) {
+                  db.query("ROLLBACK", () => {
+                    res.status(500).send("Lỗi commit giao dịch");
+                    callback(commitErr);
+                  });
+                  return;
+                }
+                res.json(data);
+                callback();
+              });
+            }
+          );
+        } else {
+          db.query(
+            `SELECT id, username, link_save_file, errorNW FROM acc_gmail WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (NOW() - INTERVAL '24 HOUR') LIMIT 1 FOR UPDATE`,
+            [pc_name],
+            (error, results) => {
+              if (error) {
+                return db.query("ROLLBACK", () => {
+                  res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
+                  callback(error);
+                });
+              }
+
+              if (results.rows.length > 0) {
+                const data = results.rows[0];
+                db.query(
+                  `UPDATE acc_gmail SET kt = 1 WHERE id = $1`,
+                  [data.id],
+                  (updateError) => {
+                    if (updateError) {
+                      console.error("Lỗi cập nhật cơ sở dữ liệu:", updateError);
+                      return db.query("ROLLBACK", () => {
+                        res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
+                        callback(updateError);
+                      });
+                    }
+                    db.query("COMMIT", (commitErr) => {
+                      if (commitErr) {
+                        db.query("ROLLBACK", () => {
+                          res.status(500).send("Lỗi commit giao dịch");
+                          callback(commitErr);
+                        });
+                        return;
+                      }
+                      res.json(data);
+                      callback();
+                    });
+                  }
+                );
+              } else {
+                db.query("ROLLBACK", () => {
+                  res.status(404).send("Không tìm thấy dữ liệu");
+                  callback();
+                });
+              }
+            }
+          );
+        }
+      }
+    );
+  });
+};
+
+const queue = async.queue(worker, 1);
+
+router.get("/nuoi_gmail", (req, res) => {
   const pc_name = req.query.pc_name;
 
-  if (!pc_name) {
-    return res.status(400).json({ error: 'Thiếu tham số "pc_name"' });
-  }
-
-  try {
-    await query("BEGIN");
-
-    let results = await query(
-      "SELECT id, username, link_save_file FROM mcr_gmail WHERE kt = 0 AND date_reg <= (current_timestamp - interval '3 hours') AND pc_name = $1 AND (status <> 'Nuoixong' OR status IS NULL) LIMIT 1 FOR UPDATE",
-      [pc_name]
-    );
-
-    if (results.rowCount > 0) {
-      const data = results.rows[0];
-      await query("UPDATE mcr_gmail SET kt = 1 WHERE id = $1", [data.id]);
-      await query("COMMIT");
-      return res.json(data);
-    } else {
-      results = await query(
-        "SELECT id, username, link_save_file FROM mcr_gmail WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (current_timestamp - interval '24 hours') LIMIT 1 FOR UPDATE",
-        [pc_name]
-      );
-      if (results.rowCount > 0) {
-        const data = results.rows[0];
-        await query("UPDATE mcr_gmail SET kt = 1 WHERE id = $1", [data.id]);
-        await query("COMMIT");
-        return res.json(data);
-      } else {
-        await query("ROLLBACK");
-        return res
-          .status(404)
-          .json({ error: "Không tìm thấy dữ liệu phù hợp" });
+  if (pc_name === undefined) {
+    res.status(400).send('Thiếu tham số "pc_name"');
+  } else {
+    queue.push({ pc_name, res }, (err) => {
+      if (err) {
+        console.error("Lỗi khi thực hiện tác vụ:", err);
       }
-    }
-  } catch (error) {
-    await query("ROLLBACK");
-    return res
-      .status(500)
-      .json({ error: "Lỗi truy vấn cơ sở dữ liệu", details: error });
+    });
   }
 });
 

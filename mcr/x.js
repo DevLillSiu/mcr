@@ -3,168 +3,226 @@ const router = express.Router();
 const db = require("./database");
 const util = require("util");
 const query = util.promisify(db.query).bind(db);
+const async = require("async");
+
+const queueGetCookie = async.queue((task, callback) => {
+  db.beginTransaction((err) => {
+    if (err) {
+      console.error("Transaction error:", err);
+      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
+      return;
+    }
+
+    db.query(
+      `SELECT id, cookie FROM acc_tw WHERE cookie IS NOT NULL AND cookie_used = 0 LIMIT 1 FOR UPDATE`,
+      (error, results) => {
+        if (error) {
+          console.error("Query error:", error);
+          db.rollback(() => {
+            callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
+          });
+          return;
+        }
+
+        if (results.rows.length === 0) {
+          db.rollback(() => {
+            callback(new Error("Không tìm thấy dữ liệu"));
+          });
+          return;
+        }
+
+        const data = results[0];
+        db.query(
+          `UPDATE acc_tw SET cookie_used = 1 WHERE id = $1 `,
+          data.id,
+          (updateError) => {
+            if (updateError) {
+              console.error("Update error:", updateError);
+              db.rollback(() => {
+                callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
+              });
+              return;
+            }
+
+            db.commit((commitErr) => {
+              if (commitErr) {
+                console.error("Commit error:", commitErr);
+                db.rollback(() => {
+                  callback(new Error("Lỗi commit giao dịch"));
+                });
+                return;
+              }
+              callback(null, data);
+            });
+          }
+        );
+      }
+    );
+  });
+}, 1);
 
 router.get("/get_cookie", (req, res) => {
-  db.query("BEGIN", (err) => {
+  queueGetCookie.push({}, (err, data) => {
     if (err) {
-      console.error("Transaction error:", err);
-      return res.status(500).send("Lỗi kết nối cơ sở dữ liệu");
+      console.error("Lỗi hàng đợi:", err);
+      return res.status(500).send(err.message);
     }
-
-    db.query(
-      `SELECT id, cookie FROM mcr_x WHERE cookie IS NOT NULL AND cookie_used = 0 LIMIT 1 FOR UPDATE`,
-      (error, results) => {
-        if (error) {
-          console.error("Query error:", error);
-          return db.query("ROLLBACK", () => {
-            res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
-          });
-        }
-
-        if (results.rowCount === 0) {
-          return db.query("ROLLBACK", () => {
-            res.status(404).send("Không tìm thấy dữ liệu");
-          });
-        }
-        const data = results.rows[0];
-        db.query(
-          `UPDATE mcr_x SET cookie_used = 1 WHERE id = $1`,
-          [data.id],
-          (updateError) => {
-            if (updateError) {
-              console.error("Update error:", updateError);
-              return db.query("ROLLBACK", () => {
-                res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
-              });
-            }
-
-            db.query("COMMIT", (commitErr) => {
-              if (commitErr) {
-                console.error("Commit error:", commitErr);
-                return db.query("ROLLBACK", () => {
-                  res.status(500).send("Lỗi commit giao dịch");
-                });
-              }
-              res.json(data);
-            });
-          }
-        );
-      }
-    );
+    res.json(data);
   });
 });
+
+function queryAsync(query, params) {
+  return new Promise((resolve, reject) => {
+    db.query(query, params, (error, res) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(res);
+      }
+    });
+  });
+}
+
+const queueCheckLive = async.queue(async (task, callback) => {
+  db.beginTransaction(async (err) => {
+    if (err) {
+      console.error("Transaction error:", err);
+      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
+      return;
+    }
+
+    const queries = [
+      `SELECT id, username FROM acc_tw WHERE status IS NULL AND date_reg BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE - INTERVAL '1 day' ORDER BY date_reg DESC  LIMIT 20 FOR UPDATE`,
+      `SELECT id, username FROM acc_tw WHERE status IS NULL AND date_checkpoint <= CURRENT_DATE - INTERVAL '1 day' AND date_reg BETWEEN CURRENT_DATE - INTERVAL '14 days' AND CURRENT_DATE - INTERVAL '8 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
+      `SELECT id, username FROM acc_tw WHERE status IS NULL AND date_checkpoint <= CURRENT_DATE - INTERVAL '2 days' AND date_reg <= CURRENT_DATE - INTERVAL '14 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
+    ];
+
+    let results;
+    for (let query of queries) {
+      try {
+        let res = await queryAsync(query);
+        if (res.rowCount > 0) {
+          results = res;
+          break;
+        }
+      } catch (error) {
+        console.error("Query error:", error);
+        db.rollback(() => {
+          callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
+        });
+        return;
+      }
+    }
+
+    if (!results || results.rows.length === 0) {
+      db.rollback(() => {
+        callback(new Error("Không tìm thấy dữ liệu"));
+      });
+      return;
+    }
+
+    const updatePromises = results.map((result) =>
+      queryAsync(`UPDATE acc_tw SET status = 'checkinglive' WHERE id = $1`, [
+        result.id,
+      ])
+    );
+
+    try {
+      await Promise.all(updatePromises);
+    } catch (updateError) {
+      console.error("Update error:", updateError);
+      db.rollback(() => {
+        callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
+      });
+      return;
+    }
+
+    db.commit((commitErr) => {
+      if (commitErr) {
+        console.error("Commit error:", commitErr);
+        db.rollback(() => {
+          callback(new Error("Lỗi commit giao dịch"));
+        });
+        return;
+      }
+      callback(null, results);
+    });
+  });
+}, 1);
 
 router.get("/check_live", (req, res) => {
-  db.query("BEGIN", (err) => {
+  queueCheckLive.push({}, (err, data) => {
     if (err) {
-      console.error("Transaction error:", err);
-      return res.status(500).send("Lỗi kết nối cơ sở dữ liệu");
+      console.error("Lỗi hàng đợi:", err);
+      return res.status(500).send(err.message);
     }
-
-    db.query(
-      `SELECT id, username FROM mcr_x WHERE status IS NULL LIMIT 20 FOR UPDATE`,
-      (error, results) => {
-        if (error) {
-          console.error("Query error:", error);
-          return db.query("ROLLBACK", () => {
-            res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
-          });
-        }
-
-        if (results.rowCount === 0) {
-          return db.query("ROLLBACK", () => {
-            res.status(404).send("Không tìm thấy dữ liệu");
-          });
-        }
-
-        const updates = results.rows.map(
-          (result) =>
-            new Promise((resolve, reject) => {
-              db.query(
-                `UPDATE mcr_x SET status = 'checkinglive' WHERE id = $1`,
-                [result.id],
-                (updateError) => {
-                  if (updateError) {
-                    reject(updateError);
-                  } else {
-                    resolve();
-                  }
-                }
-              );
-            })
-        );
-
-        Promise.all(updates)
-          .then(() => {
-            db.query("COMMIT", (commitErr) => {
-              if (commitErr) {
-                console.error("Commit error:", commitErr);
-                return db.query("ROLLBACK", () => {
-                  res.status(500).send("Lỗi commit giao dịch");
-                });
-              }
-              res.json(results.rows);
-            });
-          })
-          .catch((updateError) => {
-            console.error("Update error:", updateError);
-            db.query("ROLLBACK", () => {
-              res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
-            });
-          });
-      }
-    );
+    res.json(data);
   });
 });
 
-router.get("/check_point", (req, res) => {
-  db.query("BEGIN", (err) => {
+const queueCheckPoint = async.queue((task, callback) => {
+  db.beginTransaction((err) => {
     if (err) {
       console.error("Transaction error:", err);
-      return res.status(500).send("Lỗi kết nối cơ sở dữ liệu");
+      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
+      return;
     }
 
     db.query(
-      `SELECT id, username, password, twofa FROM mcr_x WHERE status = 'checkpoint' ORDER BY date_reg ASC LIMIT 1 FOR UPDATE`,
+      `SELECT id, username, password, twofa, mail FROM acc_tw WHERE status = 'checkpoint' ORDER BY date_reg ASC LIMIT 1 FOR UPDATE`,
       (error, results) => {
         if (error) {
           console.error("Query error:", error);
-          return db.query("ROLLBACK", () => {
-            res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
+          db.rollback(() => {
+            callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
           });
+          return;
         }
 
-        if (results.rowCount === 0) {
-          return db.query("ROLLBACK", () => {
-            res.status(404).send("Không tìm thấy dữ liệu");
+        if (results.rows.length === 0) {
+          db.rollback(() => {
+            callback(new Error("Không tìm thấy dữ liệu"));
           });
+          return;
         }
 
-        const data = results.rows[0];
+        const data = results[0];
         db.query(
-          `UPDATE mcr_x SET status = 'checkingpoint' WHERE id = $1`,
-          [data.id],
+          `UPDATE acc_tw SET status = 'checkingpoint' WHERE id = $1`,
+          data.id,
           (updateError) => {
             if (updateError) {
               console.error("Update error:", updateError);
-              return db.query("ROLLBACK", () => {
-                res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
+              db.rollback(() => {
+                callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
               });
+              return;
             }
 
-            db.query("COMMIT", (commitErr) => {
+            db.commit((commitErr) => {
               if (commitErr) {
                 console.error("Commit error:", commitErr);
-                return db.query("ROLLBACK", () => {
-                  res.status(500).send("Lỗi commit giao dịch");
+                db.rollback(() => {
+                  callback(new Error("Lỗi commit giao dịch"));
                 });
+                return;
               }
-              res.json(data);
+              callback(null, data);
             });
           }
         );
       }
     );
+  });
+}, 1);
+
+router.get("/check_point", (req, res) => {
+  queueCheckPoint.push({}, (err, data) => {
+    if (err) {
+      console.error("Lỗi hàng đợi:", err);
+      return res.status(500).send(err.message);
+    }
+    res.json(data);
   });
 });
 
@@ -245,7 +303,7 @@ router.put("/update", async (req, res) => {
 
   try {
     const results = await query(queryString, queryParamsArray);
-    if (results.rowCount === 0) {
+    if (results.rows.length === 0) {
       res.status(404).send("Record not found");
     } else {
       console.log("Database updated successfully");
