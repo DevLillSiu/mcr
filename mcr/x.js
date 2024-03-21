@@ -262,7 +262,7 @@ router.put("/update", async (req, res) => {
 
   try {
     const results = await query(queryString, queryParamsArray);
-    if (results.rows.length === 0) {
+    if (results.rowCount === 0) {
       res.status(404).send("Record not found");
     } else {
       console.log("Database updated successfully");
