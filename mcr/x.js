@@ -10,7 +10,7 @@ const queueGetCookie = async.queue((task, callback) => {
     client.query("BEGIN").then(() => {
       client
         .query(
-          `SELECT id, cookie FROM mcr_x WHERE cookie IS NOT NULL AND cookie_used = 0 LIMIT 1 FOR UPDATE`
+          `SELECT id, cookie FROM mcr_x WHERE cookie IS NOT NULL AND cookie_used = 0 ORDER BY date_reg DESC LIMIT 1 FOR UPDATE`
         )
         .then(({ rows }) => {
           if (rows.length === 0) {
