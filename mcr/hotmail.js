@@ -6,58 +6,34 @@ const query = util.promisify(db.query).bind(db);
 const async = require("async");
 
 const queueGet = async.queue((task, callback) => {
-  db.beginTransaction((err) => {
-    if (err) {
-      console.error("Transaction error:", err);
-      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
-      return;
-    }
-
-    db.query(
-      `SELECT id, username, password FROM mcr_hotmail WHERE status = 0 LIMIT 1 FOR UPDATE`,
-      (error, results) => {
-        if (error) {
-          console.error("Query error:", error);
-          db.rollback(() => {
-            callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
-          });
-          return;
-        }
-
-        if (results.rows.length === 0) {
-          db.rollback(() => {
-            callback(new Error("Không tìm thấy dữ liệu"));
-          });
-          return;
-        }
-
-        const data = results[0];
-        db.query(
-          `UPDATE mcr_hotmail SET status = 1 WHERE id = $1`,
-          data.id,
-          (updateError) => {
-            if (updateError) {
-              console.error("Update error:", updateError);
-              db.rollback(() => {
-                callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
-              });
-              return;
-            }
-
-            db.commit((commitErr) => {
-              if (commitErr) {
-                console.error("Commit error:", commitErr);
-                db.rollback(() => {
-                  callback(new Error("Lỗi commit giao dịch"));
-                });
-                return;
-              }
-              callback(null, data);
-            });
+  db.connect().then((client) => {
+    client.query("BEGIN").then(() => {
+      client
+        .query(
+          `SELECT id, username, password FROM mcr_hotmail WHERE status = 0 LIMIT 1 FOR UPDATE`
+        )
+        .then(({ rows }) => {
+          if (rows.length === 0) {
+            throw new Error("Không tìm thấy dữ liệu");
           }
-        );
-      }
-    );
+
+          const data = rows[0];
+          client
+            .query(`UPDATE mcr_hotmail SET status = 1 WHERE id = $1`, [data.id])
+            .then(() => {
+              client.query("COMMIT").then(() => {
+                callback(null, data);
+                client.release();
+              });
+            });
+        })
+        .catch((e) => {
+          client.query("ROLLBACK").then(() => {
+            callback(e);
+            client.release();
+          });
+        });
+    });
   });
 }, 1);
 

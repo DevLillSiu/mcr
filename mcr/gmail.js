@@ -15,7 +15,7 @@ const worker = (task, callback) => {
     }
 
     db.query(
-      `SELECT id, username, link_save_file, errorNW  FROM acc_gmail WHERE kt = 0 AND date <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND (status <> 'Nuoixong' OR status IS NULL) LIMIT 1 FOR UPDATE`,
+      `SELECT id, username, link_save_file, errorNW  FROM mcr_gmail WHERE kt = 0 AND date <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND (status <> 'Nuoixong' OR status IS NULL) LIMIT 1 FOR UPDATE`,
       [pc_name],
       (error, results) => {
         if (error) {
@@ -28,7 +28,7 @@ const worker = (task, callback) => {
         if (results.rows.length > 0) {
           const data = results.rows[0];
           db.query(
-            `UPDATE acc_gmail SET kt = 1 WHERE id = $1`,
+            `UPDATE mcr_gmail SET kt = 1 WHERE id = $1`,
             [data.id],
             (updateError) => {
               if (updateError) {
@@ -53,7 +53,7 @@ const worker = (task, callback) => {
           );
         } else {
           db.query(
-            `SELECT id, username, link_save_file, errorNW FROM acc_gmail WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (NOW() - INTERVAL '24 HOUR') LIMIT 1 FOR UPDATE`,
+            `SELECT id, username, link_save_file, errorNW FROM mcr_gmail WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (NOW() - INTERVAL '24 HOUR') LIMIT 1 FOR UPDATE`,
             [pc_name],
             (error, results) => {
               if (error) {
@@ -66,7 +66,7 @@ const worker = (task, callback) => {
               if (results.rows.length > 0) {
                 const data = results.rows[0];
                 db.query(
-                  `UPDATE acc_gmail SET kt = 1 WHERE id = $1`,
+                  `UPDATE mcr_gmail SET kt = 1 WHERE id = $1`,
                   [data.id],
                   (updateError) => {
                     if (updateError) {

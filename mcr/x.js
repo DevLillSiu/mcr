@@ -6,58 +6,34 @@ const query = util.promisify(db.query).bind(db);
 const async = require("async");
 
 const queueGetCookie = async.queue((task, callback) => {
-  db.beginTransaction((err) => {
-    if (err) {
-      console.error("Transaction error:", err);
-      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
-      return;
-    }
-
-    db.query(
-      `SELECT id, cookie FROM acc_tw WHERE cookie IS NOT NULL AND cookie_used = 0 LIMIT 1 FOR UPDATE`,
-      (error, results) => {
-        if (error) {
-          console.error("Query error:", error);
-          db.rollback(() => {
-            callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
-          });
-          return;
-        }
-
-        if (results.rows.length === 0) {
-          db.rollback(() => {
-            callback(new Error("Không tìm thấy dữ liệu"));
-          });
-          return;
-        }
-
-        const data = results[0];
-        db.query(
-          `UPDATE acc_tw SET cookie_used = 1 WHERE id = $1 `,
-          data.id,
-          (updateError) => {
-            if (updateError) {
-              console.error("Update error:", updateError);
-              db.rollback(() => {
-                callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
-              });
-              return;
-            }
-
-            db.commit((commitErr) => {
-              if (commitErr) {
-                console.error("Commit error:", commitErr);
-                db.rollback(() => {
-                  callback(new Error("Lỗi commit giao dịch"));
-                });
-                return;
-              }
-              callback(null, data);
-            });
+  db.connect().then((client) => {
+    client.query("BEGIN").then(() => {
+      client
+        .query(
+          `SELECT id, cookie FROM mcr_x WHERE cookie IS NOT NULL AND cookie_used = 0 LIMIT 1 FOR UPDATE`
+        )
+        .then(({ rows }) => {
+          if (rows.length === 0) {
+            throw new Error("Không tìm thấy dữ liệu");
           }
-        );
-      }
-    );
+
+          const data = rows[0];
+          client
+            .query(`UPDATE mcr_x SET cookie_used = 1 WHERE id = $1`, [data.id])
+            .then(() => {
+              client.query("COMMIT").then(() => {
+                callback(null, data);
+                client.release();
+              });
+            });
+        })
+        .catch((e) => {
+          client.query("ROLLBACK").then(() => {
+            callback(e);
+            client.release();
+          });
+        });
+    });
   });
 }, 1);
 
@@ -71,81 +47,86 @@ router.get("/get_cookie", (req, res) => {
   });
 });
 
-function queryAsync(query, params) {
-  return new Promise((resolve, reject) => {
-    db.query(query, params, (error, res) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(res);
-      }
-    });
+function queryAsync(client, query, params, callback) {
+  client.query(query, params, (error, res) => {
+    if (error) {
+      callback(error);
+    } else {
+      callback(null, res);
+    }
   });
 }
 
-const queueCheckLive = async.queue(async (task, callback) => {
-  db.beginTransaction(async (err) => {
-    if (err) {
-      console.error("Transaction error:", err);
-      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
-      return;
-    }
+const queueCheckLive = async.queue((task, callback) => {
+  db.connect().then((client) => {
+    client.query("BEGIN").then(() => {
+      const queries = [
+        `SELECT id, username FROM mcr_x WHERE status IS NULL AND date_reg BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE - INTERVAL '1 day' ORDER BY date_reg DESC  LIMIT 20 FOR UPDATE`,
+        `SELECT id, username FROM mcr_x WHERE status IS NULL AND date_cp <= CURRENT_DATE - INTERVAL '1 day' AND date_reg BETWEEN CURRENT_DATE - INTERVAL '14 days' AND CURRENT_DATE - INTERVAL '8 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
+        `SELECT id, username FROM mcr_x WHERE status IS NULL AND date_cp <= CURRENT_DATE - INTERVAL '2 days' AND date_reg <= CURRENT_DATE - INTERVAL '14 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
+      ];
 
-    const queries = [
-      `SELECT id, username FROM acc_tw WHERE status IS NULL AND date_reg BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE - INTERVAL '1 day' ORDER BY date_reg DESC  LIMIT 20 FOR UPDATE`,
-      `SELECT id, username FROM acc_tw WHERE status IS NULL AND date_checkpoint <= CURRENT_DATE - INTERVAL '1 day' AND date_reg BETWEEN CURRENT_DATE - INTERVAL '14 days' AND CURRENT_DATE - INTERVAL '8 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
-      `SELECT id, username FROM acc_tw WHERE status IS NULL AND date_checkpoint <= CURRENT_DATE - INTERVAL '2 days' AND date_reg <= CURRENT_DATE - INTERVAL '14 days' ORDER BY date_reg DESC LIMIT 20 FOR UPDATE`,
-    ];
+      let results;
+      let queryIndex = 0;
 
-    let results;
-    for (let query of queries) {
-      try {
-        let res = await queryAsync(query);
-        if (res.rowCount > 0) {
-          results = res;
-          break;
+      function executeQuery() {
+        if (queryIndex >= queries.length) {
+          if (!results || results.length === 0) {
+            client.query("ROLLBACK").then(() => {
+              callback(new Error("Không tìm thấy dữ liệu"));
+              client.release();
+            });
+          } else {
+            const updatePromises = results.map(
+              (result) =>
+                new Promise((resolve, reject) => {
+                  queryAsync(
+                    client,
+                    `UPDATE mcr_x SET status = 'checkinglive' WHERE id = $1`,
+                    [result.id],
+                    (err, res) => {
+                      if (err) {
+                        reject(err);
+                      } else {
+                        resolve(res);
+                      }
+                    }
+                  );
+                })
+            );
+
+            Promise.all(updatePromises)
+              .then(() => {
+                client.query("COMMIT").then(() => {
+                  callback(null, results);
+                  client.release();
+                });
+              })
+              .catch((err) => {
+                client.query("ROLLBACK").then(() => {
+                  callback(err);
+                  client.release();
+                });
+              });
+          }
+        } else {
+          queryAsync(client, queries[queryIndex++], null, (err, res) => {
+            if (err) {
+              client.query("ROLLBACK").then(() => {
+                callback(err);
+                client.release();
+              });
+            } else if (res.rowCount > 0) {
+              results = res.rows;
+              executeQuery();
+            } else {
+              executeQuery();
+            }
+          });
         }
-      } catch (error) {
-        console.error("Query error:", error);
-        db.rollback(() => {
-          callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
-        });
-        return;
       }
-    }
 
-    if (!results || results.rows.length === 0) {
-      db.rollback(() => {
-        callback(new Error("Không tìm thấy dữ liệu"));
-      });
-      return;
-    }
-
-    const updatePromises = results.map((result) =>
-      queryAsync(`UPDATE acc_tw SET status = 'checkinglive' WHERE id = $1`, [
-        result.id,
-      ])
-    );
-
-    try {
-      await Promise.all(updatePromises);
-    } catch (updateError) {
-      console.error("Update error:", updateError);
-      db.rollback(() => {
-        callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
-      });
-      return;
-    }
-
-    db.commit((commitErr) => {
-      if (commitErr) {
-        console.error("Commit error:", commitErr);
-        db.rollback(() => {
-          callback(new Error("Lỗi commit giao dịch"));
-        });
-        return;
-      }
-      callback(null, results);
+      executeQuery();
     });
   });
 }, 1);
@@ -161,58 +142,36 @@ router.get("/check_live", (req, res) => {
 });
 
 const queueCheckPoint = async.queue((task, callback) => {
-  db.beginTransaction((err) => {
-    if (err) {
-      console.error("Transaction error:", err);
-      callback(new Error("Lỗi kết nối cơ sở dữ liệu"));
-      return;
-    }
-
-    db.query(
-      `SELECT id, username, password, twofa, mail FROM acc_tw WHERE status = 'checkpoint' ORDER BY date_reg ASC LIMIT 1 FOR UPDATE`,
-      (error, results) => {
-        if (error) {
-          console.error("Query error:", error);
-          db.rollback(() => {
-            callback(new Error("Lỗi truy vấn cơ sở dữ liệu"));
-          });
-          return;
-        }
-
-        if (results.rows.length === 0) {
-          db.rollback(() => {
-            callback(new Error("Không tìm thấy dữ liệu"));
-          });
-          return;
-        }
-
-        const data = results[0];
-        db.query(
-          `UPDATE acc_tw SET status = 'checkingpoint' WHERE id = $1`,
-          data.id,
-          (updateError) => {
-            if (updateError) {
-              console.error("Update error:", updateError);
-              db.rollback(() => {
-                callback(new Error("Lỗi cập nhật cơ sở dữ liệu"));
-              });
-              return;
-            }
-
-            db.commit((commitErr) => {
-              if (commitErr) {
-                console.error("Commit error:", commitErr);
-                db.rollback(() => {
-                  callback(new Error("Lỗi commit giao dịch"));
-                });
-                return;
-              }
-              callback(null, data);
-            });
+  db.connect().then((client) => {
+    client.query("BEGIN").then(() => {
+      client
+        .query(
+          `SELECT id, username, password, twofa, mail FROM mcr_x WHERE status = 'checkpoint' ORDER BY date_reg ASC LIMIT 1 FOR UPDATE`
+        )
+        .then(({ rows }) => {
+          if (rows.length === 0) {
+            throw new Error("Không tìm thấy dữ liệu");
           }
-        );
-      }
-    );
+
+          const data = rows[0];
+          client
+            .query(`UPDATE mcr_x SET status = 'checkingpoint' WHERE id = $1`, [
+              data.id,
+            ])
+            .then(() => {
+              client.query("COMMIT").then(() => {
+                callback(null, data);
+                client.release();
+              });
+            });
+        })
+        .catch((e) => {
+          client.query("ROLLBACK").then(() => {
+            callback(e);
+            client.release();
+          });
+        });
+    });
   });
 }, 1);
 
