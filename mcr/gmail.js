@@ -28,7 +28,7 @@ const worker = (task, callback) => {
         if (results.rows.length > 0) {
           const data = results.rows[0];
           db.query(
-            `UPDATE mcr_gmail SET kt = 1 WHERE id = $1`,
+            `UPDATE mcr_gmail SET kt = 1, time_rs = NOW() WHERE id = $1`,
             [data.id],
             (updateError) => {
               if (updateError) {
@@ -66,7 +66,7 @@ const worker = (task, callback) => {
               if (results.rows.length > 0) {
                 const data = results.rows[0];
                 db.query(
-                  `UPDATE mcr_gmail SET kt = 1 WHERE id = $1`,
+                  `UPDATE mcr_gmail SET kt = 1, time_rs = NOW() WHERE id = $1`,
                   [data.id],
                   (updateError) => {
                     if (updateError) {

@@ -82,7 +82,7 @@ const queueCheckLive = async.queue((task, callback) => {
                 new Promise((resolve, reject) => {
                   queryAsync(
                     client,
-                    `UPDATE mcr_x SET status = 'checkinglive' WHERE id = $1`,
+                    `UPDATE mcr_x SET status = 'checkinglive', time_rs = NOW() WHERE id = $1`,
                     [result.id],
                     (err, res) => {
                       if (err) {
@@ -155,9 +155,10 @@ const queueCheckPoint = async.queue((task, callback) => {
 
           const data = rows[0];
           client
-            .query(`UPDATE mcr_x SET status = 'checkingpoint' WHERE id = $1`, [
-              data.id,
-            ])
+            .query(
+              `UPDATE mcr_x SET status = 'checkingpoint', time_rs = NOW() WHERE id = $1`,
+              [data.id]
+            )
             .then(() => {
               client.query("COMMIT").then(() => {
                 callback(null, data);
