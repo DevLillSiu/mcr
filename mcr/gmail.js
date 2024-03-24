@@ -35,7 +35,7 @@ const worker = async (task, callback) => {
     await query("BEGIN");
 
     let results = await query(
-      `SELECT id, username, link_save_file, error_nw  FROM mcr_gmail WHERE kt = 0 AND date_reg <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND (status <> 'Nuoixong' OR status <> 'DaBan' OR status IS NULL) LIMIT 1 FOR UPDATE`,
+      `SELECT id, username, link_save_file, error_nw  FROM mcr_gmail WHERE kt = 0 AND date_reg <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND status IS NULL LIMIT 1 FOR UPDATE`,
       [pc_name]
     );
 
