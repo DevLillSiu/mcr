@@ -5,102 +5,73 @@ const util = require("util");
 const query = util.promisify(db.query).bind(db);
 const async = require("async");
 
-const worker = (task, callback) => {
+const validatePcName = (pc_name, res) => {
+  if (!pc_name || typeof pc_name !== "string" || pc_name.trim().length === 0) {
+    res.status(400).send('Tham số "pc_name" không hợp lệ');
+    throw new Error('Tham số "pc_name" không hợp lệ');
+  }
+};
+
+const rollback = async (res, message, error) => {
+  await query("ROLLBACK");
+  res.status(500).send(message);
+  throw error;
+};
+
+const commit = async () => {
+  try {
+    await query("COMMIT");
+  } catch (commitErr) {
+    await rollback("Lỗi commit giao dịch", commitErr);
+  }
+};
+
+const worker = async (task, callback) => {
   const { pc_name, res } = task;
 
-  db.query("BEGIN", (err) => {
-    if (err) {
-      res.status(500).send("Lỗi kết nối cơ sở dữ liệu");
-      return callback(err);
-    }
+  try {
+    validatePcName(pc_name, res);
 
-    db.query(
-      `SELECT id, username, link_save_file, error_nw  FROM mcr_gmail WHERE kt = 0 AND date_reg <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND (status <> 'Nuoixong' OR status IS NULL) LIMIT 1 FOR UPDATE`,
-      [pc_name],
-      (error, results) => {
-        if (error) {
-          return db.query("ROLLBACK", () => {
-            res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
-            callback(error);
-          });
-        }
+    await query("BEGIN");
 
-        if (results.rows.length > 0) {
-          const data = results.rows[0];
-          db.query(
-            `UPDATE mcr_gmail SET kt = 1, time_rs = NOW() WHERE id = $1`,
-            [data.id],
-            (updateError) => {
-              if (updateError) {
-                console.error("Lỗi cập nhật cơ sở dữ liệu:", updateError);
-                return db.query("ROLLBACK", () => {
-                  res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
-                  callback(updateError);
-                });
-              }
-              db.query("COMMIT", (commitErr) => {
-                if (commitErr) {
-                  db.query("ROLLBACK", () => {
-                    res.status(500).send("Lỗi commit giao dịch");
-                    callback(commitErr);
-                  });
-                  return;
-                }
-                res.json(data);
-                callback();
-              });
-            }
-          );
-        } else {
-          db.query(
-            `SELECT id, username, link_save_file, error_nw FROM mcr_gmail WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (NOW() - INTERVAL '24 HOUR') LIMIT 1 FOR UPDATE`,
-            [pc_name],
-            (error, results) => {
-              if (error) {
-                return db.query("ROLLBACK", () => {
-                  res.status(500).send("Lỗi truy vấn cơ sở dữ liệu");
-                  callback(error);
-                });
-              }
-
-              if (results.rows.length > 0) {
-                const data = results.rows[0];
-                db.query(
-                  `UPDATE mcr_gmail SET kt = 1, time_rs = NOW() WHERE id = $1`,
-                  [data.id],
-                  (updateError) => {
-                    if (updateError) {
-                      console.error("Lỗi cập nhật cơ sở dữ liệu:", updateError);
-                      return db.query("ROLLBACK", () => {
-                        res.status(500).send("Lỗi cập nhật cơ sở dữ liệu");
-                        callback(updateError);
-                      });
-                    }
-                    db.query("COMMIT", (commitErr) => {
-                      if (commitErr) {
-                        db.query("ROLLBACK", () => {
-                          res.status(500).send("Lỗi commit giao dịch");
-                          callback(commitErr);
-                        });
-                        return;
-                      }
-                      res.json(data);
-                      callback();
-                    });
-                  }
-                );
-              } else {
-                db.query("ROLLBACK", () => {
-                  res.status(404).send("Không tìm thấy dữ liệu");
-                  callback();
-                });
-              }
-            }
-          );
-        }
-      }
+    let results = await query(
+      `SELECT id, username, link_save_file, error_nw  FROM mcr_gmail WHERE kt = 0 AND date_reg <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND (status <> 'Nuoixong' OR status <> 'DaBan' OR status IS NULL) LIMIT 1 FOR UPDATE`,
+      [pc_name]
     );
-  });
+
+    if (results.rows.length > 0) {
+      const data = results.rows[0];
+      await query(
+        `UPDATE mcr_gmail SET kt = 1, time_rs = NOW() WHERE id = $1`,
+        [data.id]
+      );
+      await commit();
+      callback();
+      res.json(data);
+    } else {
+      results = await query(
+        `SELECT id, username, link_save_file, error_nw FROM mcr_gmail WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (NOW() - INTERVAL '24 HOUR') LIMIT 1 FOR UPDATE`,
+        [pc_name]
+      );
+
+      if (results.rows.length > 0) {
+        const data = results.rows[0];
+        await query(
+          `UPDATE mcr_gmail SET kt = 1, time_rs = NOW() WHERE id = $1`,
+          [data.id]
+        );
+        await commit();
+        callback();
+        res.json(data);
+      } else {
+        await rollback(res, "Không tìm thấy dữ liệu");
+        callback();
+      }
+    }
+  } catch (error) {
+    console.error("Lỗi khi thực hiện tác vụ:", error);
+    callback(error);
+  }
 };
 
 const queue = async.queue(worker, 1);
@@ -226,6 +197,22 @@ router.delete("/delete", async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).send("Error deleting data from database");
+  }
+});
+
+router.put("/reset", async (req, res) => {
+  const sqlQuery =
+    "UPDATE mcr_gmail SET status = NULL, date_nuoi = NULL, kt = 0 , time_rs = NULL  WHERE ((status = 'Login' AND time_rs <= (NOW() - INTERVAL '30 MINUTE'))   OR (status = 'Youtube' AND time_rs <= (NOW() - INTERVAL '30 MINUTE')) OR (status IS NULL AND kt = 1 AND time_rs <= (NOW() - INTERVAL '30 MINUTE')))";
+
+  try {
+    const result = await query(sqlQuery);
+    if (result.rowCount === 0) {
+      return res.status(200).send("No records were updated");
+    }
+    res.send("Data updated successfully");
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send("Error updated data from database" + err);
   }
 });
 
