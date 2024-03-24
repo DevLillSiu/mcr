@@ -46,7 +46,9 @@ const worker = async (task, callback) => {
         [data.id]
       );
       await commit();
-      callback();
+      if (typeof callback === "function") {
+        callback();
+      }
       res.json(data);
     } else {
       results = await query(
@@ -61,16 +63,22 @@ const worker = async (task, callback) => {
           [data.id]
         );
         await commit();
-        callback();
+        if (typeof callback === "function") {
+          callback();
+        }
         res.json(data);
       } else {
         await rollback(res, "Không tìm thấy dữ liệu");
-        callback();
+        if (typeof callback === "function") {
+          callback();
+        }
       }
     }
   } catch (error) {
     console.error("Lỗi khi thực hiện tác vụ:", error);
-    callback(error);
+    if (typeof callback === "function") {
+      callback(error);
+    }
   }
 };
 
