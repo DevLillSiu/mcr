@@ -3,49 +3,98 @@ const router = express.Router();
 const db = require("./database");
 const util = require("util");
 const query = util.promisify(db.query).bind(db);
+const async = require("async");
 
-router.get("/nuoi_tiktok", async (req, res) => {
-  const pc_name = req.query.pc_name;
-
-  if (!pc_name) {
-    return res.status(400).json({ error: 'Thiếu tham số "pc_name"' });
+const validatePcName = (pc_name, res) => {
+  if (!pc_name || typeof pc_name !== "string" || pc_name.trim().length === 0) {
+    res.status(400).send('Tham số "pc_name" không hợp lệ');
+    throw new Error('Tham số "pc_name" không hợp lệ');
   }
+};
+
+const rollback = async (res, message, error) => {
+  await query("ROLLBACK");
+  res.status(500).send(message);
+  throw error;
+};
+
+const commit = async () => {
+  try {
+    await query("COMMIT");
+  } catch (commitErr) {
+    await rollback("Lỗi commit giao dịch", commitErr);
+  }
+};
+
+const worker = async (task, callback) => {
+  const { pc_name, res } = task;
 
   try {
+    validatePcName(pc_name, res);
+
     await query("BEGIN");
 
     let results = await query(
-      "SELECT id, username, link_save_file FROM mcr_tiktok WHERE kt = 0 AND date_reg <= (current_timestamp - interval '3 hours') AND pc_name = $1 AND (status <> 'Nuoixong' OR status IS NULL) LIMIT 1 FOR UPDATE",
+      `SELECT id, username, password, cookie  FROM mcr_tiktok WHERE kt = 0 AND date_reg <= (NOW() - INTERVAL '3 HOUR') AND pc_name = $1 AND status IS NULL LIMIT 1 FOR UPDATE`,
       [pc_name]
     );
 
-    if (results.rowCount > 0) {
+    if (results.rows.length > 0) {
       const data = results.rows[0];
-      await query("UPDATE mcr_tiktok SET kt = 1 WHERE id = $1", [data.id]);
-      await query("COMMIT");
-      return res.json(data);
+      await query(
+        `UPDATE mcr_tiktok SET kt = 1, time_rs = NOW() WHERE id = $1`,
+        [data.id]
+      );
+      await commit();
+      if (typeof callback === "function") {
+        callback();
+      }
+      res.json(data);
     } else {
       results = await query(
-        "SELECT id, username, link_save_file FROM mcr_tiktok WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (current_timestamp - interval '24 hours') LIMIT 1 FOR UPDATE",
+        `SELECT id, username, password, cookie FROM mcr_tiktok WHERE kt = 0 AND pc_name = $1 AND status = 'Nuoixong' AND date_nuoi <= (NOW() - INTERVAL '24 HOUR') LIMIT 1 FOR UPDATE`,
         [pc_name]
       );
-      if (results.rowCount > 0) {
+
+      if (results.rows.length > 0) {
         const data = results.rows[0];
-        await query("UPDATE mcr_tiktok SET kt = 1 WHERE id = $1", [data.id]);
-        await query("COMMIT");
-        return res.json(data);
+        await query(
+          `UPDATE mcr_tiktok SET kt = 1, time_rs = NOW() WHERE id = $1`,
+          [data.id]
+        );
+        await commit();
+        if (typeof callback === "function") {
+          callback();
+        }
+        res.json(data);
       } else {
-        await query("ROLLBACK");
-        return res
-          .status(404)
-          .json({ error: "Không tìm thấy dữ liệu phù hợp" });
+        await rollback(res, "Không tìm thấy dữ liệu");
+        if (typeof callback === "function") {
+          callback();
+        }
       }
     }
   } catch (error) {
-    await query("ROLLBACK");
-    return res
-      .status(500)
-      .json({ error: "Lỗi truy vấn cơ sở dữ liệu", details: error });
+    console.error("Lỗi khi thực hiện tác vụ:", error);
+    if (typeof callback === "function") {
+      callback(error);
+    }
+  }
+};
+
+const queue = async.queue(worker, 1);
+
+router.get("/nuoi", (req, res) => {
+  const pc_name = req.query.pc_name;
+
+  if (pc_name === undefined) {
+    res.status(400).send('Thiếu tham số "pc_name"');
+  } else {
+    queue.push({ pc_name, res }, (err) => {
+      if (err) {
+        console.error("Lỗi khi thực hiện tác vụ:", err);
+      }
+    });
   }
 });
 
